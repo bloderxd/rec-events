@@ -7,8 +7,6 @@ import numpy as np
 import pandas as pd
 
 regs_df = rf.load_fixture()
-
-num_event = regs_df.event.nunique()
 num_user = regs_df.user.nunique()
 num_hidden_1 = 10
 num_hidden_2 = 5
@@ -43,8 +41,8 @@ def decoder(x):
 decoder_op = decoder(encoder(auto_encoder_value))
 
 
-def train_model(epochs=20, batch_size=5):
-    matrix = regs_df.pivot(index='event', columns='user', values='score')
+def train_model(data_frame, epochs=20, batch_size=5):
+    matrix = data_frame.pivot(index='event', columns='user', values='score')
     matrix.fillna(0, inplace=True)
     events = matrix.index.tolist()
     users = matrix.columns.tolist()
@@ -89,3 +87,8 @@ def predict(matrix, events, users):
         predictions['user'] = predictions['user'].map(lambda user: users[user])
         predictions['event'] = predictions['event'].map(lambda event: events[event])
     return predictions
+
+
+def build_predictions():
+    matrix, events, users = train_model(regs_df)
+    return predict(matrix, events, users), regs_df
