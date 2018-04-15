@@ -1,8 +1,10 @@
 import os
+
 os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 from mock_data import regs_fixtures as rf
 import tensorflow as tf
 import numpy as np
+import pandas as pd
 
 regs_df = rf.load_fixture()
 
@@ -38,10 +40,15 @@ def decoder(x):
     return tf.nn.sigmoid(tf.add(tf.matmul(layer_1, weights['decoder_h2']), biases['decoder_b2']))
 
 
+decoder_op = decoder(encoder(auto_encoder_value))
+
+
 def train_model(epochs=20, batch_size=5):
     matrix = regs_df.pivot(index='event', columns='user', values='score')
     matrix.fillna(0, inplace=True)
-    loss = tf.losses.mean_squared_error(auto_encoder_value, decoder(encoder(auto_encoder_value)))
+    events = matrix.index.tolist()
+    users = matrix.columns.tolist()
+    loss = tf.losses.mean_squared_error(auto_encoder_value, decoder_op)
     optimizer = tf.train.RMSPropOptimizer(0.03).minimize(loss)
     matrix = matrix.as_matrix()
     init = tf.global_variables_initializer()
@@ -63,3 +70,22 @@ def train_model(epochs=20, batch_size=5):
             avg_cost /= num_batches
 
             print("Training: {} Loss: {}".format(i + 1, avg_cost))
+    return matrix, events, users
+
+
+def predict(matrix, events, users):
+    matrix = np.concatenate(matrix, axis=0)
+    init = tf.global_variables_initializer()
+    local_init = tf.local_variables_initializer()
+    with tf.Session() as session:
+        print('Predicting...')
+        session.run(init)
+        session.run(local_init)
+        pre_preds = session.run(decoder_op, feed_dict={auto_encoder_value: matrix})
+        predictions = pd.DataFrame()
+        predictions = predictions.append(pd.DataFrame(pre_preds))
+        predictions = predictions.stack().reset_index(name='score')
+        predictions.columns = ['event', 'user', 'score']
+        predictions['user'] = predictions['user'].map(lambda user: users[user])
+        predictions['event'] = predictions['event'].map(lambda event: events[event])
+    return predictions
