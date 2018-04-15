@@ -1,0 +1,1 @@
+from regs_fixtures import load_fixture
